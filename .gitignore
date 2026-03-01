@@ -33,22 +33,11 @@ coverage.xml
 
 # YOLO/ML specifics
 runs/
-*.pt
-!yolov8n-cls.pt
-# Keep the base models if desired, but often large models are ignored. 
-# Attempting to exclude generated models in runs/ runs/ already covers it.
-# If the user wants to keep the root pt files I won't ignore *.pt generally, 
-# but runs/ is definitely temporary.
-# I will only ignore runs/ for now and let the user decide on specific pt files unless they are in runs.
 
 # OS generated files
 .DS_Store
 Thumbs.db
 
-# Data and Models
+# Data
 fire_dataset/
 data/
-models/
-
-# Ignore all yolo models
-*.pt
