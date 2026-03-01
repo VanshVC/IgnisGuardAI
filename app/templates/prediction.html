@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IgnisGuard AI | Predictive Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0a0a0c;
+            color: #e2e8f0;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        #map {
+            height: 600px;
+            width: 100%;
+            border-radius: 1.5rem;
+            z-index: 1;
+            background: #222;
+        }
+    </style>
+</head>
+
+<body class="p-6">
+    <!-- Alert Banner -->
+    <div id="alert-banner"
+        class="hidden fixed top-0 left-0 w-full bg-red-600/90 backdrop-blur-md z-[1000] p-4 text-white shadow-2xl animate-pulse">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <span class="text-3xl">⚠️</span>
+                <div>
+                    <h2 class="font-bold text-lg">CRITICAL FIRE WARNING</h2>
+                    <p class="text-sm opacity-90" id="alert-msg">Extreme fire danger detected in this sector.</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('alert-banner').classList.add('hidden')"
+                class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors">Dismiss</button>
+        </div>
+    </div>
+
+    <nav class="flex justify-between items-center mb-8 glass p-4 rounded-2xl">
+        <div class="flex items-center gap-4">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-600 bg-clip-text text-transparent">
+                IgnisGuard Predicton
+            </h1>
+            <a href="/" class="text-sm text-gray-400 hover:text-white transition-colors">← Back to Command Center</a>
+        </div>
+        <div class="flex gap-4">
+            <span
+                class="flex items-center gap-2 px-4 py-1 rounded-full bg-blue-500/10 text-blue-400 text-sm border border-blue-500/20">
+                <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> Predictive Engine Ready
+            </span>
+        </div>
+    </nav>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Sidebar: Controls -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="glass p-8 rounded-3xl h-full flex flex-col justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold mb-2 text-white">Risk Estimator</h2>
+                    <p class="text-gray-400 text-sm mb-6">Select a global location to analyze <br>pre-ignition fire
+                        probability.</p>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Target
+                                Latitude</label>
+                            <input type="number" id="lat-in" step="0.0001"
+                                class="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none transition-colors"
+                                placeholder="0.0000">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Target
+                                Longitude</label>
+                            <input type="number" id="lon-in" step="0.0001"
+                                class="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:border-blue-500 outline-none transition-colors"
+                                placeholder="0.0000">
+                        </div>
+
+                        <p class="text-xs text-gray-500 italic mt-2">✨ Tip: Click on the map to auto-fill coordinates.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button id="btn-predict"
+                        class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl font-bold shadow-lg shadow-blue-900/40 text-white transition-all transform hover:scale-[1.02] active:scale-95 text-lg">
+                        Analyze Risk Probability
+                    </button>
+                    <p id="status-msg" class="text-center text-xs text-gray-500 mt-3"></p>
+                </div>
+
+                <!-- Live Auto-Scan Toggle -->
+                <div class="mt-6 pt-6 border-t border-white/10">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+                            <label class="text-xs font-semibold text-orange-400 uppercase tracking-wider">Live AI
+                                Patrol</label>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="auto-scan-toggle" class="sr-only peer">
+                            <div
+                                class="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-600">
+                            </div>
+                        </label>
+                    </div>
+                    <p class="text-[10px] text-gray-500 italic">Automatically scans global hotspots and runs predictive
+                        models.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main: Map -->
+        <div class="lg:col-span-8">
+            <div class="glass p-2 rounded-3xl border border-white/10 relative">
+                <div id="map"></div>
+
+                <!-- Floating Result Card -->
+                <div id="result-card"
+                    class="absolute top-6 right-6 w-96 glass p-6 rounded-2xl backdrop-blur-xl border border-white/20 shadow-2xl transition-all opacity-0 translate-y-4 z-[999] pointer-events-none">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase tracking-widest">Estimated Probability</p>
+                            <h3 class="text-4xl font-bold text-white mt-1" id="prob-val">--</h3>
+                        </div>
+                        <span id="risk-badge"
+                            class="px-3 py-1 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 border border-gray-700">
+                            WAITING
+                        </span>
+                    </div>
+
+                    <div class="space-y-3">
+                        <!-- Progress Bar -->
+                        <div class="h-2 w-full bg-black/40 rounded-full overflow-hidden">
+                            <div id="prob-bar" class="h-full bg-gray-600 w-0 transition-all duration-1000"></div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 mt-4 text-xs">
+                            <div class="bg-black/20 p-2 rounded-lg">
+                                <p class="text-gray-500">Avg Temp</p>
+                                <p class="font-semibold text-orange-300" id="val-temp">--</p>
+                            </div>
+                            <div class="bg-black/20 p-2 rounded-lg">
+                                <p class="text-gray-500">Vegetation (NDVI)</p>
+                                <p class="font-semibold text-green-300" id="val-ndvi">--</p>
+                            </div>
+                            <div class="bg-black/20 p-2 rounded-lg">
+                                <p class="text-gray-500">Humidity</p>
+                                <p class="font-semibold text-blue-300" id="val-humid">--</p>
+                            </div>
+                            <div class="bg-black/20 p-2 rounded-lg">
+                                <p class="text-gray-500">Wind Speed</p>
+                                <p class="font-semibold text-gray-300" id="val-wind">--</p>
+                            </div>
+                        </div>
+
+                        <!-- Forecast Chart -->
+                        <div class="mt-4 pt-4 border-t border-white/10">
+                            <p class="text-[10px] text-gray-400 uppercase tracking-widest mb-2">7-Day Risk Forecast</p>
+                            <div class="h-32 w-full">
+                                <canvas id="forecastChart"></canvas>
+                            </div>
+                        </div>
+
+                        <p class="text-[9px] text-right text-gray-600 mt-2" id="source-tag">Source: --</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Section -->
+    <div class="mt-6 glass p-8 rounded-3xl">
+        <h3 class="text-xl font-semibold mb-6 text-gray-200">Contributing Risk Factors</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
+
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p class="text-sm text-gray-400 mb-2">Temperature Risk</p>
+                <div class="text-2xl font-bold text-orange-400" id="risk-temp">0.0</div>
+                <div class="w-full bg-black/40 h-1 mt-2 rounded-full">
+                    <div id="bar-temp" class="h-full bg-orange-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p class="text-sm text-gray-400 mb-2">Dryness (NDVI)</p>
+                <div class="text-2xl font-bold text-green-400" id="risk-ndvi">0.0</div>
+                <div class="w-full bg-black/40 h-1 mt-2 rounded-full">
+                    <div id="bar-ndvi" class="h-full bg-green-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p class="text-sm text-gray-400 mb-2">Low Humidity</p>
+                <div class="text-2xl font-bold text-blue-400" id="risk-humid">0.0</div>
+                <div class="w-full bg-black/40 h-1 mt-2 rounded-full">
+                    <div id="bar-humid" class="h-full bg-blue-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p class="text-sm text-gray-400 mb-2">Wind Factor</p>
+                <div class="text-2xl font-bold text-gray-300" id="risk-wind">0.0</div>
+                <div class="w-full bg-black/40 h-1 mt-2 rounded-full">
+                    <div id="bar-wind" class="h-full bg-gray-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let map, marker, circle, forecastChartInstance, heatLayer;
+        let predictionLayers = L.layerGroup(); // Group for result markers
+
+        // Simulating Global Heat Data (Random points concentrated in warm zones)
+        function generateHeatData() {
+            const points = [];
+            // India/SE Asia
+            for (let i = 0; i < 40; i++) points.push([15 + Math.random() * 15, 75 + Math.random() * 15, Math.random()]);
+            // Africa
+            for (let i = 0; i < 30; i++) points.push([0 + Math.random() * 20, 20 + Math.random() * 20, Math.random()]);
+            // Australia
+            for (let i = 0; i < 20; i++) points.push([-25 + Math.random() * 10, 130 + Math.random() * 20, Math.random()]);
+            // Americas
+            for (let i = 0; i < 30; i++) points.push([-10 + Math.random() * 20, -60 + Math.random() * 20, Math.random()]);
+
+            return points;
+        }
+
+        // Tile Layers Definition
+        const lightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        });
+
+        const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        });
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        });
+
+        const streetLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        });
+
+        const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 13
+        });
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Init Map with Dark Layer by default
+            map = L.map('map', {
+                center: [20.0, 78.0],
+                zoom: 4,
+                layers: [darkLayer, predictionLayers]
+            });
+
+            // Initialize Heat Layer
+            const heatPoints = generateHeatData();
+            heatLayer = L.heatLayer(heatPoints, {
+                radius: 25,
+                blur: 15,
+                maxZoom: 17,
+                gradient: { 0.4: 'blue', 0.65: 'lime', 1: 'red' }
+            });
+            heatLayer.addTo(map);
+
+            // Base Layers
+            const baseMaps = {
+                "Dark (Default)": darkLayer,
+                "Light (Clean)": lightLayer,
+                "Satellite (Esri)": satelliteLayer,
+                "Street (Esri)": streetLayer,
+                "OpenStreetMap": osmLayer,
+                "Terrain": terrainLayer
+            };
+
+            // Overlay Layers
+            const overlayMaps = {
+                "Prediction Results": predictionLayers,
+                "Risk Heatmap": heatLayer
+            };
+
+            // Add Layer Control
+            L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
+
+            // Click Handler
+            map.on('click', (e) => {
+                const { lat, lng } = e.latlng;
+                updateMarker(lat, lng);
+            });
+
+            const latIn = document.getElementById('lat-in');
+            const lonIn = document.getElementById('lon-in');
+
+            function updateMarker(lat, lng) {
+                if (marker) predictionLayers.removeLayer(marker);
+                marker = L.marker([lat, lng]).addTo(predictionLayers);
+
+                latIn.value = lat.toFixed(4);
+                lonIn.value = lng.toFixed(4);
+
+                document.getElementById('status-msg').innerText = "Coordinates selected. Ready to analyze.";
+            }
+        });
+
+        document.getElementById('btn-predict').onclick = async () => {
+            const lat = parseFloat(document.getElementById('lat-in').value);
+            const lon = parseFloat(document.getElementById('lon-in').value);
+            const btn = document.getElementById('btn-predict');
+            const status = document.getElementById('status-msg');
+
+            if (isNaN(lat) || isNaN(lon)) {
+                alert("Please select a location first.");
+                return;
+            }
+
+            btn.innerText = "Analyzing Satellite Data...";
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            status.innerText = "Fetching Landsat 9 thermal bands & weather models...";
+
+            try {
+                const res = await fetch(`/predict-risk?lat=${lat}&lon=${lon}`);
+                const data = await res.json();
+
+                renderResults(data);
+
+                btn.innerText = "Analyze Risk Probability";
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                status.innerText = "Analysis Complete.";
+
+            } catch (e) {
+                console.error(e);
+                status.innerText = "Error fetching prediction.";
+                btn.innerText = "Try Again";
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        };
+
+        function renderResults(data) {
+            const p = data.prediction;
+            const input = data.input_data;
+            const card = document.getElementById('result-card');
+            const alertData = data.alert;
+
+            // Handle Alert
+            const banner = document.getElementById('alert-banner');
+            banner.classList.add('hidden');
+
+            if (alertData && alertData.status === 'CRITICAL') {
+                document.getElementById('alert-msg').innerText = alertData.message;
+                banner.classList.remove('hidden');
+
+                // Play warning sound (optional)
+            }
+
+            // Show Card
+            card.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+
+            // 1. Probability
+            document.getElementById('prob-val').innerText = (p.probability * 100).toFixed(0) + "%";
+
+            // 2. Risk Badge
+            const badge = document.getElementById('risk-badge');
+            badge.innerText = p.risk_level;
+
+            let color = "gray";
+            if (p.risk_level === 'HIGH') color = "red";
+            if (p.risk_level === 'MEDIUM') color = "yellow";
+            if (p.risk_level === 'LOW') color = "green";
+
+            badge.className = `px-3 py-1 rounded-lg text-xs font-bold border border-${color}-500/50 bg-${color}-500/10 text-${color}-400`;
+
+            // 3. Prob Bar
+            const bar = document.getElementById('prob-bar');
+            bar.style.width = (p.probability * 100) + "%";
+            bar.className = `h-full transition-all duration-1000 bg-${color}-500 shadow-[0_0_15px_rgba(var(--${color}-500),0.5)]`;
+
+            // 4. Input Values
+            document.getElementById('val-temp').innerText = input.lst_k ? (input.lst_k - 273.15).toFixed(1) + "°C" : "--";
+            document.getElementById('val-ndvi').innerText = input.ndvi;
+            document.getElementById('val-humid').innerText = input.humidity + "%";
+            document.getElementById('val-wind').innerText = input.wind_speed + " km/h";
+
+            document.getElementById('source-tag').innerText = "Source: " + data.data_source;
+
+            // 5. Detailed Factors
+            updateRiskBar('temp', p.components.temp_risk || 0);
+            updateRiskBar('ndvi', p.components.ndvi_risk || 0);
+            updateRiskBar('humid', p.components.humidity_risk || 0);
+            updateRiskBar('wind', p.components.wind_risk || 0);
+
+            // 6. Map Overlay
+            if (circle) predictionLayers.removeLayer(circle);
+
+            let circleColor = '#10b981';
+            if (p.risk_level === 'MEDIUM') circleColor = '#eab308';
+            if (p.risk_level === 'HIGH') circleColor = '#ef4444';
+
+            circle = L.circle([data.location.lat, data.location.lon], {
+                color: circleColor,
+                fillColor: circleColor,
+                fillOpacity: 0.3,
+                radius: 5000 // 5km radius viz
+            }).addTo(predictionLayers);
+
+            map.flyTo([data.location.lat, data.location.lon], 10);
+
+            // 7. Render Forecast Chart
+            if (data.forecast && data.forecast.length > 0) {
+                renderForecastChart(data.forecast);
+            }
+        }
+
+        function renderForecastChart(forecast) {
+            const ctx = document.getElementById('forecastChart').getContext('2d');
+
+            const labels = forecast.map(d => new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }));
+            const data = forecast.map(d => d.risk_probability * 100);
+
+            if (forecastChartInstance) {
+                forecastChartInstance.destroy();
+            }
+
+            forecastChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Risk %',
+                        data: data,
+                        borderColor: '#fb923c', // Orange-400
+                        backgroundColor: 'rgba(251, 146, 60, 0.2)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#9ca3af', font: { size: 8 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#9ca3af', font: { size: 8 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateRiskBar(id, val) {
+            document.getElementById(`risk-${id}`).innerText = val;
+            document.getElementById(`bar-${id}`).style.width = (val * 100) + "%";
+        }
+
+        // --- Live Auto-Scan Logic ---
+        let autoScanInterval = null;
+        const autoScanToggle = document.getElementById('auto-scan-toggle');
+
+        autoScanToggle.onchange = () => {
+            if (autoScanToggle.checked) {
+                document.getElementById('status-msg').innerText = "Initiating Global Patrol Sequence...";
+                runAutoScan(); // Run immediately
+                autoScanInterval = setInterval(runAutoScan, 12000); // Loop every 12s
+            } else {
+                clearInterval(autoScanInterval);
+                document.getElementById('status-msg').innerText = "Patrol Deactivated. Manual Mode.";
+            }
+        };
+
+        async function runAutoScan() {
+            try {
+                // 1. Get a target from Global Scan Service
+                // We reuse the /live-satellite endpoint just to get a valid 'Global Hotspot' coordinate
+                const res = await fetch('/live-satellite?scan_mode=global');
+                const data = await res.json();
+
+                if (data.location) {
+                    const { lat, lon, name } = data.location;
+
+                    // 2. Update Inputs
+                    document.getElementById('lat-in').value = lat.toFixed(4);
+                    document.getElementById('lon-in').value = lon.toFixed(4);
+
+                    // 3. Trigger Prediction Analysis
+                    // We simulate a click to reuse the robust logic in 'btn-predict.onclick'
+                    document.getElementById('btn-predict').click();
+
+                    // Optional: Update status to show where we are
+                    setTimeout(() => {
+                        document.getElementById('status-msg').innerText = `Patrolling: ${name}`;
+                    }, 500);
+                }
+
+            } catch (err) {
+                console.error("Auto-Scan Error:", err);
+            }
+        }
+    </script>
+</body>
+
+</html>
